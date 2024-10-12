@@ -16,7 +16,9 @@ app.use('/api', require('./routes/appointmentRoutes')); // Use the appointment r
 app.use('/api', require('./routes/paymentRoutes')); // Use the payment routes under "/api"
 app.use('/api', require('./routes/employeeRoutes')); // Use the employee routes under "/api"    
 app.use('/api', require('./routes/leaveRoutes')); // Use the leave routes under "/api"
-app.use('/api', require('./routes/userRoutes')); // Use the user routes under "/api"
+// app.use('/api', require('./routes/userRoutes')); // Use the user routes under "/api"
+// app.use('/api', require('./routes/authRoutes')); // Use the auth routes under "/api"
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

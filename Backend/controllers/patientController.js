@@ -1,5 +1,6 @@
 // patientController.js
 const patientService = require('../services/patientService');
+const bcrypt = require('bcryptjs');
 
 class PatientController {
     async getAllPatients(req, res) {
@@ -50,6 +51,35 @@ class PatientController {
             res.status(200).json({ message: 'Patient deleted successfully' });
         } catch (err) {
             res.status(500).json({ error: err.message });
+        }
+    }
+
+    // Patient login
+    async login(req, res) {
+        const { email, password } = req.body;
+
+        // Validate input
+        if (!email || !password) {
+        return res.status(400).json({ message: 'Email and password are required.' });
+        }
+
+        try {
+        // Find patient by email
+        const patient = await patientService.getPatientByEmail(email);
+        if (!patient) {
+            return res.status(400).json({ message: 'Invalid email or password.' });
+        }
+
+        // Compare the password
+        const isPasswordValid = await bcrypt.compare(password, patient.password);
+        if (!isPasswordValid) {
+            return res.status(400).json({ message: 'Invalid email or password.' });
+        }
+
+        // If valid, return patient data
+        res.status(200).json({ message: 'Login successful', patient });
+        } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
         }
     }
 }

@@ -4,7 +4,16 @@ class AppointmentService {
 
   // Get all appointments
   async getAllAppointments() {
-    const sql = 'SELECT * FROM Appointments';
+    const sql = `SELECT 
+        a.appointment_id, 
+        d.name AS doctor_name, 
+        a.appointment_date, 
+        a.appointment_time, 
+        a.payment_amount, 
+        a.status, 
+        a.patient_id 
+      FROM Appointments a
+      JOIN Doctors d ON a.doctor_id = d.doctor_id;`;
     try {
       const [rows] = await db.query(sql);
       return rows;
