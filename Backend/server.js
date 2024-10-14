@@ -18,6 +18,7 @@ app.use('/api', require('./routes/employeeRoutes')); // Use the employee routes 
 app.use('/api', require('./routes/leaveRoutes')); // Use the leave routes under "/api"
 // app.use('/api', require('./routes/userRoutes')); // Use the user routes under "/api"
 // app.use('/api', require('./routes/authRoutes')); // Use the auth routes under "/api"
+app.use('/api', require('./routes/prescriptionRoutes')); // Use the prescription routes under "/app"
 
 
 const PORT = process.env.PORT || 5000;

@@ -1,4 +1,5 @@
 const db = require('../config/db');  // Using the promise-based db connection
+const bcrypt = require('bcryptjs');  // For password hashing
 
 class DoctorService {
 
@@ -24,15 +25,29 @@ class DoctorService {
     }
   }
 
-  // Create a new doctor
+  // Get a doctor by email (for login)
+  async getDoctorByEmail(email) {
+    const sql = 'SELECT * FROM doctors WHERE email = ?';
+    try {
+      const [result] = await db.query(sql, [email]);
+      return result.length > 0 ? result[0] : null;
+    } catch (err) {
+      throw new Error(`Error fetching doctor with email ${email}: ${err.message}`);
+    }
+  }
+
+  // Create a new doctor (hashes the password before storing it)
   async createDoctor(doctor) {
-    const { name, specialty, bio, years_of_experience, consultation_fee, email, phone, available_from, available_to } = doctor;
+    const { name, specialty, bio, years_of_experience, consultation_fee, email, phone, available_from, available_to, password } = doctor;
+
+    const hashedPassword = await bcrypt.hash(password, 10); // Hash the password before storing
+
     const sql = `
-      INSERT INTO doctors (name, specialty, bio, years_of_experience, consultation_fee, email, phone, available_from, available_to)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO doctors (name, specialty, bio, years_of_experience, consultation_fee, email, phone, available_from, available_to, password)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     try {
-      const [result] = await db.query(sql, [name, specialty, bio, years_of_experience, consultation_fee, email, phone, available_from, available_to]);
+      const [result] = await db.query(sql, [name, specialty, bio, years_of_experience, consultation_fee, email, phone, available_from, available_to, hashedPassword]);
       return result.insertId;
     } catch (err) {
       throw new Error(`Error creating doctor: ${err.message}`);
