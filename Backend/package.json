@@ -19,7 +19,8 @@
     "express": "^4.21.0",
     "jsonwebtoken": "^9.0.2",
     "mysql2": "^3.11.3",
-    "sequelize": "^6.37.3"
+    "sequelize": "^6.37.3",
+    "xml2js": "^0.6.2"
   },
   "devDependencies": {
     "chai": "^5.1.1",

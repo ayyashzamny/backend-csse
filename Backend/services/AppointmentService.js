@@ -1,19 +1,34 @@
 const db = require('../config/db');  // Ensure the database connection
+const fs = require('fs');
+const path = require('path');
+const xml2js = require('xml2js');
+const { promisify } = require('util');
+
+// Promisify fs.readFile for async/await usage
+const readFile = promisify(fs.readFile);
+const parser = new xml2js.Parser();
+
+let queries = {};
+
+// Load XML queries from the file
+const loadQueries = async () => {
+    try {
+        const data = await readFile(path.join(__dirname, '../sql/AppointmentQueries.xml'), 'utf-8');
+        const result = await parser.parseStringPromise(data);
+        queries = result.queries;
+    } catch (err) {
+        console.error('Error loading SQL queries:', err);
+    }
+};
+
+// Initialize queries on server start
+loadQueries();
 
 class AppointmentService {
 
   // Get all appointments
   async getAllAppointments() {
-    const sql = `SELECT 
-        a.appointment_id, 
-        d.name AS doctor_name, 
-        a.appointment_date, 
-        a.appointment_time, 
-        a.payment_amount, 
-        a.status, 
-        a.patient_id 
-      FROM Appointments a
-      JOIN Doctors d ON a.doctor_id = d.doctor_id;`;
+    const sql = queries.getAllAppointments[0];
     try {
       const [rows] = await db.query(sql);
       return rows;
@@ -24,7 +39,7 @@ class AppointmentService {
 
   // Get an appointment by ID
   async getAppointmentById(id) {
-    const sql = 'SELECT * FROM Appointments WHERE appointment_id = ?';
+    const sql = queries.getAppointmentById[0];
     try {
       const [result] = await db.query(sql, [id]);
       return result.length > 0 ? result[0] : null;
@@ -36,10 +51,7 @@ class AppointmentService {
   // Create a new appointment
   async createAppointment(appointment) {
     const { patient_id, doctor_id, appointment_date, appointment_time, appointment_type, status, payment_status, payment_amount } = appointment;
-    const sql = `
-      INSERT INTO Appointments (patient_id, doctor_id, appointment_date, appointment_time, appointment_type, status, payment_status, payment_amount)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `;
+    const sql = queries.createAppointment[0];
     try {
       const [result] = await db.query(sql, [
         patient_id,
@@ -60,11 +72,7 @@ class AppointmentService {
   // Update an appointment by ID
   async updateAppointment(id, appointment) {
     const { patient_id, doctor_id, appointment_date, appointment_time, appointment_type, status, payment_status, payment_amount } = appointment;
-    const sql = `
-      UPDATE Appointments 
-      SET patient_id = ?, doctor_id = ?, appointment_date = ?, appointment_time = ?, appointment_type = ?, status = ?, payment_status = ?, payment_amount = ?
-      WHERE appointment_id = ?
-    `;
+    const sql = queries.updateAppointment[0];
     try {
       await db.query(sql, [
         patient_id,
@@ -84,7 +92,7 @@ class AppointmentService {
 
   // Delete an appointment by ID
   async deleteAppointment(id) {
-    const sql = 'DELETE FROM Appointments WHERE appointment_id = ?';
+    const sql = queries.deleteAppointment[0];
     try {
       await db.query(sql, [id]);
     } catch (err) {
@@ -94,54 +102,35 @@ class AppointmentService {
 
   // Fetch appointments with patient and doctor names
   async getAppointmentsWithDetails() {
-    const query = `
-      SELECT 
-        a.appointment_id, 
-        p.name AS patient_name, 
-        d.name AS doctor_name, 
-        a.appointment_date, 
-        a.appointment_time, 
-        a.appointment_type, 
-        a.status, 
-        a.payment_status, 
-        a.payment_amount 
-      FROM Appointments a
-      JOIN Patients p ON a.patient_id = p.patient_id
-      JOIN Doctors d ON a.doctor_id = d.doctor_id
-    `;
+    const sql = queries.getAppointmentsWithDetails[0];
     try {
-      const [rows] = await db.query(query);
+      const [rows] = await db.query(sql);
       return rows;
     } catch (err) {
       throw new Error(`Error fetching appointments with details: ${err.message}`);
     }
   }
 
+  // Update appointment status
   async updateAppointmentStatus(appointment_id, status) {
-    const query = `
-      UPDATE Appointments 
-      SET status = ? 
-      WHERE appointment_id = ?
-    `;
+    const sql = queries.updateAppointmentStatus[0];
     try {
-      await db.query(query, [status, appointment_id]);
+      await db.query(sql, [status, appointment_id]);
     } catch (err) {
       throw new Error(`Error updating appointment status: ${err.message}`);
     }
   }
 
+  // Get booked times for a doctor on a specific date
   async getBookedTimes(doctor_id, appointment_date) {
-    const query = `
-        SELECT appointment_time 
-        FROM Appointments 
-        WHERE doctor_id = ? 
-        AND appointment_date = ?
-        AND status IN ('Pending', 'Confirmed')
-    `;
-    const [rows] = await db.query(query, [doctor_id, appointment_date]);
-    return rows.map(row => row.appointment_time.substr(0, 5)); // Ensure time is in 'HH:mm' format
-}
-
+    const sql = queries.getBookedTimes[0];
+    try {
+      const [rows] = await db.query(sql, [doctor_id, appointment_date]);
+      return rows.map(row => row.appointment_time.substr(0, 5)); // Ensure time is in 'HH:mm' format
+    } catch (err) {
+      throw new Error(`Error fetching booked times: ${err.message}`);
+    }
+  }
 }
 
 module.exports = new AppointmentService();

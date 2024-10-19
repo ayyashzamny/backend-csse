@@ -1,11 +1,34 @@
-const db = require('../config/db');  // Using the promise-based db connection
+const fs = require('fs');
+const path = require('path');
+const { promisify } = require('util');
+const xml2js = require('xml2js');
+const db = require('../config/db');  // Ensure the database connection
 const bcrypt = require('bcryptjs');  // For password hashing
+
+// Read the XML file and parse it
+const readFile = promisify(fs.readFile);
+const parser = new xml2js.Parser();
+
+let queries = {};
+
+const loadQueries = async () => {
+    try {
+        const data = await readFile(path.join(__dirname, '../sql/DoctorQueries.xml'), 'utf-8');
+        const result = await parser.parseStringPromise(data);
+        queries = result.queries;
+    } catch (err) {
+        console.error('Error loading SQL queries:', err);
+    }
+};
+
+// Initialize queries on server start
+loadQueries();
 
 class DoctorService {
 
   // Get all doctors
   async getAllDoctors() {
-    const sql = 'SELECT * FROM doctors';
+    const sql = queries.getAllDoctors[0];
     try {
       const [rows] = await db.query(sql);
       return rows;
@@ -16,7 +39,7 @@ class DoctorService {
 
   // Get a doctor by ID
   async getDoctorById(id) {
-    const sql = 'SELECT * FROM doctors WHERE doctor_id = ?';
+    const sql = queries.getDoctorById[0];
     try {
       const [result] = await db.query(sql, [id]);
       return result.length > 0 ? result[0] : null;
@@ -27,7 +50,7 @@ class DoctorService {
 
   // Get a doctor by email (for login)
   async getDoctorByEmail(email) {
-    const sql = 'SELECT * FROM doctors WHERE email = ?';
+    const sql = queries.getDoctorByEmail[0];
     try {
       const [result] = await db.query(sql, [email]);
       return result.length > 0 ? result[0] : null;
@@ -42,10 +65,7 @@ class DoctorService {
 
     const hashedPassword = await bcrypt.hash(password, 10); // Hash the password before storing
 
-    const sql = `
-      INSERT INTO doctors (name, specialty, bio, years_of_experience, consultation_fee, email, phone, available_from, available_to, password)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
+    const sql = queries.createDoctor[0];
     try {
       const [result] = await db.query(sql, [name, specialty, bio, years_of_experience, consultation_fee, email, phone, available_from, available_to, hashedPassword]);
       return result.insertId;
@@ -57,11 +77,7 @@ class DoctorService {
   // Update a doctor by ID
   async updateDoctor(id, doctor) {
     const { name, specialty, bio, years_of_experience, consultation_fee, email, phone, available_from, available_to } = doctor;
-    const sql = `
-      UPDATE doctors 
-      SET name = ?, specialty = ?, bio = ?, years_of_experience = ?, consultation_fee = ?, email = ?, phone = ?, available_from = ?, available_to = ?
-      WHERE doctor_id = ?
-    `;
+    const sql = queries.updateDoctor[0];
     try {
       await db.query(sql, [name, specialty, bio, years_of_experience, consultation_fee, email, phone, available_from, available_to, id]);
     } catch (err) {
@@ -71,7 +87,7 @@ class DoctorService {
 
   // Delete a doctor by ID
   async deleteDoctor(id) {
-    const sql = 'DELETE FROM doctors WHERE doctor_id = ?';
+    const sql = queries.deleteDoctor[0];
     try {
       await db.query(sql, [id]);
     } catch (err) {

@@ -1,126 +1,99 @@
-const db = require('../config/db');  // Your promise-based MySQL connection
+const fs = require('fs');
+const path = require('path');
+const { promisify } = require('util');
+const xml2js = require('xml2js');
+const db = require('../config/db');  // Ensure the database connection
 
-const createPrescription = async (prescription) => {
+// Read the XML file and parse it
+const readFile = promisify(fs.readFile);
+const parser = new xml2js.Parser();
+
+let queries = {};
+
+const loadQueries = async () => {
+    try {
+        const data = await readFile(path.join(__dirname, '../sql/PrescriptionQueries.xml'), 'utf-8');
+        const result = await parser.parseStringPromise(data);
+        queries = result.queries;
+    } catch (err) {
+        console.error('Error loading SQL queries:', err);
+    }
+};
+
+// Initialize queries on server start
+loadQueries();
+
+class PrescriptionService {
+
+  // Get all prescriptions
+  async getAllPrescriptions() {
+    const sql = queries.getAllPrescriptions[0];
+    try {
+      const [rows] = await db.query(sql);
+      return rows;
+    } catch (err) {
+      throw new Error(`Error fetching prescriptions: ${err.message}`);
+    }
+  }
+
+  // Get prescription by ID
+  async getPrescriptionById(id) {
+    const sql = queries.getPrescriptionById[0];
+    try {
+      const [result] = await db.query(sql, [id]);
+      return result.length > 0 ? result[0] : null;
+    } catch (err) {
+      throw new Error(`Error fetching prescription with ID ${id}: ${err.message}`);
+    }
+  }
+
+  // Create a new prescription
+  async createPrescription(prescription) {
     const { patient_id, doctor_id, medicine_name, dosage, frequency, prescription_date, status } = prescription;
-    const sql = `
-        INSERT INTO prescriptions (patient_id, doctor_id, medicine_name, dosage, frequency, prescription_date, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    `;
+    const sql = queries.createPrescription[0];
     try {
-        await db.query(sql, [patient_id, doctor_id, medicine_name, dosage, frequency, prescription_date, status]);
+      const [result] = await db.query(sql, [
+        patient_id, doctor_id, medicine_name, dosage, frequency, prescription_date, status
+      ]);
+      return result.insertId;
     } catch (err) {
-        throw new Error(`Error creating prescription: ${err.message}`);
+      throw new Error(`Error creating prescription: ${err.message}`);
     }
-};
+  }
 
-const getAllPrescriptions = async () => {
-    const sql = `
-        SELECT 
-            p.prescription_id, 
-            p.medicine_name, 
-            p.dosage, 
-            p.frequency, 
-            p.prescription_date, 
-            p.status, 
-            pa.name AS patient_name, 
-            d.name AS doctor_name
-        FROM prescriptions p
-        JOIN patients pa ON p.patient_id = pa.patient_id
-        JOIN doctors d ON p.doctor_id = d.doctor_id
-    `;
+  // Update a prescription by ID
+  async updatePrescription(id, prescription) {
+    const { patient_id, doctor_id, medicine_name, dosage, frequency, prescription_date, status } = prescription;
+    const sql = queries.updatePrescription[0];
     try {
-        const [rows] = await db.query(sql);
-        return rows;
+      await db.query(sql, [
+        patient_id, doctor_id, medicine_name, dosage, frequency, prescription_date, status, id
+      ]);
     } catch (err) {
-        throw new Error(`Error fetching prescriptions: ${err.message}`);
+      throw new Error(`Error updating prescription with ID ${id}: ${err.message}`);
     }
-};
+  }
 
-const getPrescriptionsByPatient = async (patient_id) => {
-    const sql = `
-        SELECT 
-            p.prescription_id, 
-            p.medicine_name, 
-            p.dosage, 
-            p.frequency, 
-            p.prescription_date, 
-            p.status 
-        FROM prescriptions p
-        WHERE p.patient_id = ?
-    `;
+  // Delete a prescription by ID
+  async deletePrescription(id) {
+    const sql = queries.deletePrescription[0];
     try {
-        const [rows] = await db.query(sql, [patient_id]);
-        return rows;
+      await db.query(sql, [id]);
     } catch (err) {
-        throw new Error(`Error fetching prescriptions for patient ${patient_id}: ${err.message}`);
+      throw new Error(`Error deleting prescription with ID ${id}: ${err.message}`);
     }
-};
+  }
 
-
-const updatePrescription = async (prescription_id, { medicine_name, dosage, frequency, status, prescription_date }) => {
-    const sql = `
-        UPDATE prescriptions 
-        SET 
-            medicine_name = ?, 
-            dosage = ?, 
-            frequency = ?, 
-            status = ?, 
-            prescription_date = ?
-        WHERE prescription_id = ?
-    `;
-    
+  // Get prescriptions by patient ID
+  async getPrescriptionsByPatient(patient_id) {
+    const sql = queries.getPrescriptionsByPatient[0];
     try {
-        await db.query(sql, [medicine_name, dosage, frequency, status, prescription_date, prescription_id]);
+      const [rows] = await db.query(sql, [patient_id]);
+      return rows;
     } catch (err) {
-        throw new Error(`Error updating prescription with ID ${prescription_id}: ${err.message}`);
+      throw new Error(`Error fetching prescriptions for patient ID ${patient_id}: ${err.message}`);
     }
-};
+  }
+}
 
-
-const deletePrescription = async (prescription_id) => {
-    const sql = `DELETE FROM prescriptions WHERE prescription_id = ?`;
-    try {
-        await db.query(sql, [prescription_id]);
-    } catch (err) {
-        throw new Error(`Error deleting prescription with ID ${prescription_id}: ${err.message}`);
-    }
-};
-
-const updatePrescriptionStatus = async (id, status) => {
-    const sql = 'UPDATE prescriptions SET status = ? WHERE prescription_id = ?';
-    await db.query(sql, [status, id]);
-};
-
-// Service function to fetch prescriptions by patient ID along with the doctor's name
-const getPrescriptionsByPatientDoc = async (patient_id) => {
-    const sql = `
-        SELECT 
-            p.prescription_id, 
-            p.medicine_name, 
-            p.dosage, 
-            p.frequency, 
-            p.prescription_date, 
-            p.status, 
-            d.name AS doctor_name
-        FROM prescriptions p
-        JOIN doctors d ON p.doctor_id = d.doctor_id
-        WHERE p.patient_id = ?
-    `;
-
-    try {
-        const [rows] = await db.query(sql, [patient_id]);
-        return rows;
-    } catch (error) {
-        throw new Error('Error fetching prescriptions: ' + error.message);
-    }
-};
-
-module.exports = {
-    createPrescription,
-    getAllPrescriptions,
-    getPrescriptionsByPatient,
-    updatePrescription,
-    deletePrescription,
-    updatePrescriptionStatus,
-    getPrescriptionsByPatientDoc
-};
+module.exports = new PrescriptionService();

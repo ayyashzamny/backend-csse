@@ -1,9 +1,11 @@
-const chai = require('chai');
-const chaiHttp = require('chai-http');
-const server = require('../server');
+// Use ES module import syntax for chai and chai-http
+import chai from 'chai';
+import chaiHttp from 'chai-http';
+import { server } from '../server';  // Adjust according to your module format
 
-chai.should();
+const { should } = chai;
 chai.use(chaiHttp);
+should();
 
 describe('Doctors API', () => {
 
